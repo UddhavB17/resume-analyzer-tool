@@ -71,6 +71,17 @@ def json_response(handler, status_code, payload):
     handler.wfile.write(body)
 
 
+def html_response(handler, include_body=True):
+    """Write the main HTML interface from the repository root."""
+    body = (ROOT / "index.html").read_bytes()
+    handler.send_response(200)
+    handler.send_header("Content-Type", "text/html; charset=utf-8")
+    handler.send_header("Content-Length", str(len(body)))
+    handler.end_headers()
+    if include_body:
+        handler.wfile.write(body)
+
+
 def get_history():
     """Return recent SQLite results from the current function instance."""
     if not DB_PATH.exists():
@@ -91,9 +102,16 @@ def get_history():
 class handler(BaseHTTPRequestHandler):
     """Handle resume analyzer API routes for the Vercel deployment."""
 
+    def do_HEAD(self):
+        """Return headers for the main HTML page."""
+        html_response(self, include_body=False)
+
     def do_GET(self):
-        """Return saved history for the `/api/history` route."""
-        json_response(self, 200, {"results": get_history()})
+        """Return saved history for API requests or the main HTML page otherwise."""
+        if self.path.startswith("/api/history"):
+            json_response(self, 200, {"results": get_history()})
+            return
+        html_response(self)
 
     def do_POST(self):
         """Accept JSON input, analyze the resume, save it, and return the report."""

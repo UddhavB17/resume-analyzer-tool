@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+resume_results.db
+.streamlit/
+.vercel/
+.DS_Store

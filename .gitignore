@@ -5,3 +5,4 @@ resume_results.db
 .streamlit/
 .vercel/
 .DS_Store
+.vercel

@@ -21,7 +21,8 @@ cd /Users/uddhavbhardwaj17/Documents/Python/resume_analyzer_tool
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-streamlit run app.py
+pip install -r requirements-streamlit.txt
+streamlit run streamlit_app.py
 ```
 
 ## Vercel Deployment

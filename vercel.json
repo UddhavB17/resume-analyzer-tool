@@ -3,11 +3,11 @@
   "rewrites": [
     {
       "source": "/api/analyze",
-      "destination": "/api/analyze.py"
+      "destination": "/api/index.py"
     },
     {
       "source": "/api/history",
-      "destination": "/api/history.py"
+      "destination": "/api/index.py"
     }
   ]
 }

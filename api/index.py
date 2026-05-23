@@ -61,7 +61,7 @@ def save_result(resume_name, jd_title, score, missing_keywords, suggestions):
         )
 
 
-def response(handler, status_code, payload):
+def json_response(handler, status_code, payload):
     """Write a JSON response from the serverless function."""
     body = json.dumps(payload).encode("utf-8")
     handler.send_response(status_code)
@@ -71,8 +71,29 @@ def response(handler, status_code, payload):
     handler.wfile.write(body)
 
 
+def get_history():
+    """Return recent SQLite results from the current function instance."""
+    if not DB_PATH.exists():
+        return []
+    with sqlite3.connect(DB_PATH) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            """
+            SELECT resume_name, jd_title, score, missing_keywords, suggestions, created_at
+            FROM analyses
+            ORDER BY id DESC
+            LIMIT 10
+            """
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
 class handler(BaseHTTPRequestHandler):
-    """Handle resume analysis requests for the Vercel deployment."""
+    """Handle resume analyzer API routes for the Vercel deployment."""
+
+    def do_GET(self):
+        """Return saved history for the `/api/history` route."""
+        json_response(self, 200, {"results": get_history()})
 
     def do_POST(self):
         """Accept JSON input, analyze the resume, save it, and return the report."""
@@ -86,13 +107,13 @@ class handler(BaseHTTPRequestHandler):
             resume_base64 = payload.get("resume_base64", "")
 
             if not jd_text.strip() or not resume_base64:
-                response(self, 400, {"error": "Resume file and job description are required."})
+                json_response(self, 400, {"error": "Resume file and job description are required."})
                 return
 
             resume_bytes = base64.b64decode(resume_base64)
             resume_text = read_resume_bytes(file_name, resume_bytes)
             if not resume_text.strip():
-                response(self, 400, {"error": "Could not extract text from the resume."})
+                json_response(self, 400, {"error": "Could not extract text from the resume."})
                 return
 
             result = analyze_resume(resume_text, jd_text)
@@ -103,6 +124,6 @@ class handler(BaseHTTPRequestHandler):
                 result["missing_keywords"],
                 result["suggestions"],
             )
-            response(self, 200, result)
+            json_response(self, 200, result)
         except Exception as error:
-            response(self, 500, {"error": str(error)})
+            json_response(self, 500, {"error": str(error)})

@@ -36,6 +36,30 @@ except ImportError:
 MAX_KEYWORDS = 30
 
 
+EXTRA_STOP_WORDS = {
+    "ability",
+    "applicant",
+    "candidate",
+    "company",
+    "description",
+    "experience",
+    "job",
+    "need",
+    "needs",
+    "preferred",
+    "qualification",
+    "qualifications",
+    "required",
+    "requirements",
+    "responsibilities",
+    "responsibility",
+    "role",
+    "team",
+    "work",
+    "working",
+}
+
+
 SKILL_HINTS = {
     "python",
     "sql",
@@ -137,8 +161,28 @@ def tokenize(text):
     return [
         token
         for token in raw_tokens
-        if token not in ENGLISH_STOP_WORDS and len(token) > 1
+        if token not in ENGLISH_STOP_WORDS and token not in EXTRA_STOP_WORDS and len(token) > 1
     ]
+
+
+def normalize_token(token):
+    """Normalize a token so small suffix differences still count as matches."""
+    if len(token) > 5 and token.endswith("ies"):
+        return f"{token[:-3]}y"
+    if len(token) > 5 and token.endswith("ing"):
+        return token[:-3]
+    if len(token) > 4 and token.endswith("ed"):
+        return token[:-2]
+    if len(token) > 4 and token.endswith("es"):
+        return token[:-2]
+    if len(token) > 3 and token.endswith("s"):
+        return token[:-1]
+    return token
+
+
+def normalize_tokens(tokens):
+    """Normalize a token list into a set for broad keyword matching."""
+    return {normalize_token(token) for token in tokens}
 
 
 def extract_keywords(tokens, limit=MAX_KEYWORDS):
@@ -147,18 +191,35 @@ def extract_keywords(tokens, limit=MAX_KEYWORDS):
     return [word for word, _count in keyword_counts.most_common(limit)]
 
 
-def calculate_match_score(resume_keywords, jd_keywords):
+def calculate_match_score(resume_tokens, jd_keywords):
     """Calculate a 0-100 percentage score based on JD keyword coverage."""
     if not jd_keywords:
         return 0.0
-    matched_keywords = set(resume_keywords).intersection(jd_keywords)
-    score = (len(matched_keywords) / len(set(jd_keywords))) * 100
+    resume_terms = normalize_tokens(resume_tokens)
+    jd_terms = normalize_tokens(jd_keywords)
+    matched_keywords = resume_terms.intersection(jd_terms)
+    score = (len(matched_keywords) / len(jd_terms)) * 100
     return round(score, 2)
 
 
-def find_missing_keywords(resume_keywords, jd_keywords):
+def find_missing_keywords(resume_tokens, jd_keywords):
     """Find JD keywords that do not appear in the resume keywords."""
-    return sorted(set(jd_keywords).difference(resume_keywords))
+    resume_terms = normalize_tokens(resume_tokens)
+    missing_keywords = []
+    for keyword in jd_keywords:
+        if normalize_token(keyword) not in resume_terms:
+            missing_keywords.append(keyword)
+    return sorted(set(missing_keywords))
+
+
+def find_matched_keywords(resume_tokens, jd_keywords):
+    """Find JD keywords that are covered anywhere in the resume."""
+    resume_terms = normalize_tokens(resume_tokens)
+    matched_keywords = []
+    for keyword in jd_keywords:
+        if normalize_token(keyword) in resume_terms:
+            matched_keywords.append(keyword)
+    return sorted(set(matched_keywords))
 
 
 def identify_skill_gaps(missing_keywords):
@@ -193,12 +254,14 @@ def analyze_resume(resume_text, jd_text):
     jd_tokens = tokenize(jd_text)
     resume_keywords = extract_keywords(resume_tokens)
     jd_keywords = extract_keywords(jd_tokens)
-    score = calculate_match_score(resume_keywords, jd_keywords)
-    missing_keywords = find_missing_keywords(resume_keywords, jd_keywords)
+    score = calculate_match_score(resume_tokens, jd_keywords)
+    matched_keywords = find_matched_keywords(resume_tokens, jd_keywords)
+    missing_keywords = find_missing_keywords(resume_tokens, jd_keywords)
     skill_gaps = identify_skill_gaps(missing_keywords)
     suggestions = build_suggestions(score, missing_keywords, skill_gaps)
     return {
         "score": score,
+        "matched_keywords": matched_keywords,
         "resume_keywords": resume_keywords,
         "jd_keywords": jd_keywords,
         "missing_keywords": missing_keywords,

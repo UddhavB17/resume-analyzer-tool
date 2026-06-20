@@ -81,6 +81,8 @@ def render_report(result):
     st.write(", ".join(result["jd_keywords"]) or "No keywords found.")
     st.write("**Resume Keywords**")
     st.write(", ".join(result["resume_keywords"]) or "No keywords found.")
+    st.write("**Matched Keywords**")
+    st.write(", ".join(result["matched_keywords"]) or "No matched keywords found.")
     st.write("**Missing Keywords**")
     st.write(", ".join(result["missing_keywords"]) or "No missing keywords found.")
     st.write("**Skill Gaps**")

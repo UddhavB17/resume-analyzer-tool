@@ -205,6 +205,8 @@
         </div>
         <h3>Missing Keywords</h3>
         <div class="tags" id="missing"></div>
+        <h3>Matched Keywords</h3>
+        <div class="tags" id="matched"></div>
         <h3>Skill Gaps</h3>
         <div class="tags" id="skills"></div>
         <h3>Suggestions</h3>
@@ -269,6 +271,7 @@
           }
           document.querySelector("#score").textContent = `${data.score}%`;
           renderTags("#missing", data.missing_keywords, true);
+          renderTags("#matched", data.matched_keywords, false);
           renderTags("#skills", data.skill_gaps, true);
           const suggestions = document.querySelector("#suggestions");
           suggestions.innerHTML = "";

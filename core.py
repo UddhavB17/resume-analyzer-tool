@@ -1,5 +1,6 @@
 import re
 import zlib
+from io import BytesIO
 from collections import Counter
 
 try:
@@ -32,6 +33,11 @@ except ImportError:
         "your",
     }
 
+try:
+    from pypdf import PdfReader
+except ImportError:
+    PdfReader = None
+
 
 MAX_KEYWORDS = 30
 
@@ -50,6 +56,8 @@ EXTRA_STOP_WORDS = {
     "qualification",
     "qualifications",
     "required",
+    "requires",
+    "requiring",
     "requirements",
     "responsibilities",
     "responsibility",
@@ -128,7 +136,17 @@ def extract_text_from_pdf_stream(stream_bytes):
 
 
 def decode_pdf_bytes(pdf_bytes):
-    """Read a simple text-based PDF using only the Python standard library."""
+    """Extract text from a PDF, using pypdf when available and a basic fallback otherwise."""
+    if PdfReader:
+        try:
+            reader = PdfReader(BytesIO(pdf_bytes))
+            page_text = [page.extract_text() or "" for page in reader.pages]
+            extracted_text = " ".join(page_text).strip()
+            if extracted_text:
+                return extracted_text
+        except Exception:
+            pass
+
     text_parts = []
     for match in re.finditer(rb"stream\r?\n(.*?)\r?\nendstream", pdf_bytes, flags=re.DOTALL):
         stream_bytes = match.group(1)
@@ -191,32 +209,38 @@ def extract_keywords(tokens, limit=MAX_KEYWORDS):
     return [word for word, _count in keyword_counts.most_common(limit)]
 
 
-def calculate_match_score(resume_tokens, jd_keywords):
+def extract_required_terms(tokens):
+    """Return every unique meaningful JD term ordered by importance."""
+    term_counts = Counter(tokens)
+    return [word for word, _count in term_counts.most_common()]
+
+
+def calculate_match_score(resume_tokens, jd_terms):
     """Calculate a 0-100 percentage score based on JD keyword coverage."""
-    if not jd_keywords:
+    if not jd_terms:
         return 0.0
     resume_terms = normalize_tokens(resume_tokens)
-    jd_terms = normalize_tokens(jd_keywords)
-    matched_keywords = resume_terms.intersection(jd_terms)
-    score = (len(matched_keywords) / len(jd_terms)) * 100
+    normalized_jd_terms = normalize_tokens(jd_terms)
+    matched_keywords = resume_terms.intersection(normalized_jd_terms)
+    score = (len(matched_keywords) / len(normalized_jd_terms)) * 100
     return round(score, 2)
 
 
-def find_missing_keywords(resume_tokens, jd_keywords):
+def find_missing_keywords(resume_tokens, jd_terms):
     """Find JD keywords that do not appear in the resume keywords."""
     resume_terms = normalize_tokens(resume_tokens)
     missing_keywords = []
-    for keyword in jd_keywords:
+    for keyword in jd_terms:
         if normalize_token(keyword) not in resume_terms:
             missing_keywords.append(keyword)
     return sorted(set(missing_keywords))
 
 
-def find_matched_keywords(resume_tokens, jd_keywords):
+def find_matched_keywords(resume_tokens, jd_terms):
     """Find JD keywords that are covered anywhere in the resume."""
     resume_terms = normalize_tokens(resume_tokens)
     matched_keywords = []
-    for keyword in jd_keywords:
+    for keyword in jd_terms:
         if normalize_token(keyword) in resume_terms:
             matched_keywords.append(keyword)
     return sorted(set(matched_keywords))
@@ -254,9 +278,10 @@ def analyze_resume(resume_text, jd_text):
     jd_tokens = tokenize(jd_text)
     resume_keywords = extract_keywords(resume_tokens)
     jd_keywords = extract_keywords(jd_tokens)
-    score = calculate_match_score(resume_tokens, jd_keywords)
-    matched_keywords = find_matched_keywords(resume_tokens, jd_keywords)
-    missing_keywords = find_missing_keywords(resume_tokens, jd_keywords)
+    required_terms = extract_required_terms(jd_tokens)
+    score = calculate_match_score(resume_tokens, required_terms)
+    matched_keywords = find_matched_keywords(resume_tokens, required_terms)
+    missing_keywords = find_missing_keywords(resume_tokens, required_terms)
     skill_gaps = identify_skill_gaps(missing_keywords)
     suggestions = build_suggestions(score, missing_keywords, skill_gaps)
     return {
@@ -264,7 +289,11 @@ def analyze_resume(resume_text, jd_text):
         "matched_keywords": matched_keywords,
         "resume_keywords": resume_keywords,
         "jd_keywords": jd_keywords,
+        "required_terms": required_terms,
         "missing_keywords": missing_keywords,
         "skill_gaps": skill_gaps,
         "suggestions": suggestions,
+        "resume_word_count": len(resume_tokens),
+        "jd_word_count": len(jd_tokens),
+        "resume_preview": " ".join(resume_text.split())[:500],
     }

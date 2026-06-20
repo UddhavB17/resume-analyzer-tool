@@ -1,1 +1,1 @@
-# Vercel API deployment uses only Python standard-library modules.
+pypdf>=4.0.0

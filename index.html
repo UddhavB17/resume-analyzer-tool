@@ -218,6 +218,9 @@
       const form = document.querySelector("#analyzer-form");
       const statusBox = document.querySelector("#status");
       const report = document.querySelector("#report");
+      const apiBase = window.location.protocol === "file:"
+        ? "https://resumeanalyzertool.vercel.app"
+        : "";
 
       function toBase64(file) {
         return new Promise((resolve, reject) => {
@@ -255,7 +258,7 @@
         report.classList.add("hidden");
 
         try {
-          const response = await fetch("/api/analyze", {
+          const response = await fetch(`${apiBase}/api/analyze`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

@@ -14,6 +14,8 @@ from core import analyze_resume, read_resume_bytes
 
 
 DB_PATH = Path("/tmp/resume_results.db")
+ALLOWED_METHODS = "GET, POST, HEAD, OPTIONS"
+ALLOWED_HEADERS = "Content-Type"
 
 
 def init_database():
@@ -66,6 +68,9 @@ def json_response(handler, status_code, payload):
     body = json.dumps(payload).encode("utf-8")
     handler.send_response(status_code)
     handler.send_header("Content-Type", "application/json")
+    handler.send_header("Access-Control-Allow-Origin", "*")
+    handler.send_header("Access-Control-Allow-Methods", ALLOWED_METHODS)
+    handler.send_header("Access-Control-Allow-Headers", ALLOWED_HEADERS)
     handler.send_header("Content-Length", str(len(body)))
     handler.end_headers()
     handler.wfile.write(body)
@@ -76,6 +81,9 @@ def html_response(handler, include_body=True):
     body = (ROOT / "index.html").read_bytes()
     handler.send_response(200)
     handler.send_header("Content-Type", "text/html; charset=utf-8")
+    handler.send_header("Access-Control-Allow-Origin", "*")
+    handler.send_header("Access-Control-Allow-Methods", ALLOWED_METHODS)
+    handler.send_header("Access-Control-Allow-Headers", ALLOWED_HEADERS)
     handler.send_header("Content-Length", str(len(body)))
     handler.end_headers()
     if include_body:
@@ -101,6 +109,14 @@ def get_history():
 
 class handler(BaseHTTPRequestHandler):
     """Handle resume analyzer API routes for the Vercel deployment."""
+
+    def do_OPTIONS(self):
+        """Allow browser CORS preflight requests for local file testing."""
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", ALLOWED_METHODS)
+        self.send_header("Access-Control-Allow-Headers", ALLOWED_HEADERS)
+        self.end_headers()
 
     def do_HEAD(self):
         """Return headers for the main HTML page."""
